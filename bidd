@@ -1,0 +1,57 @@
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract InvoiceToken is ERC20 {
+    address public owner;
+    mapping(address => uint256) public balances;
+    uint256 public totalSupply;
+    uint256 public balance;
+    uint256 public minimumBid;
+    uint256 public deadline;
+    bool public isPaid;
+
+    event Bid(address bidder, uint256 amount);
+
+    constructor(
+        string memory _name,
+        string memory _symbol,
+        uint256 _totalSupply,
+        uint256 _minimumBid,
+        uint256 _deadline
+    ) ERC20(_name, _symbol) {
+        owner = msg.sender;
+        totalSupply = _totalSupply;
+        balance = _totalSupply;
+        minimumBid = _minimumBid;
+        deadline = _deadline;
+    }
+
+    function bid(uint256 _amount) public {
+        require(block.timestamp < deadline, "Deadline has passed");
+        require(_amount >= minimumBid, "Bid amount is too low");
+        require(!isPaid, "Invoice has already been paid");
+        require(balance >= _amount, "Insufficient balance");
+
+        balances[msg.sender] += _amount;
+        balance -= _amount;
+
+        emit Bid(msg.sender, _amount);
+    }
+
+    function pay() public {
+        require(msg.sender == owner, "Only owner can pay the invoice");
+        require(isPaid == false, "Invoice has already been paid");
+
+        uint256 totalBids = totalSupply - balance;
+        require(totalBids >= minimumBid, "Not enough bids to cover the minimum bid");
+
+        uint256 commission = totalBids / 10; // 10% commission
+        uint256 payout = totalBids - commission;
+
+        isPaid = true;
+
+        _mint(msg.sender, payout);
+        _mint(owner, commission);
+    }
+}
